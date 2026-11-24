@@ -8,7 +8,7 @@
  *
  * PWA 可安装性修复：
  *  - 注册同源外部 sw.js（原项目用 Blob URL 注册 SW，现代浏览器禁止，导致 SW 未注册、无法安装）
- *  - 覆写 manifest，图标使用仓库内本地 PNG（icon-192.png / icon-512.png）
+ *  - manifest 指向仓库内静态 manifest.json（blob manifest 无法通过安装校验）
  *
  * 其余业务功能（导入/导出备份、角色卡、世界书、主题等）均未改动。
  */
@@ -60,48 +60,19 @@
             });
     }
 
-    // 2) 覆写 manifest：图标改为仓库内本地 PNG
+    // 2) 指向仓库内静态 manifest.json
+    //    （blob: 协议的 manifest 在 Edge/Chrome 安装校验中不被认可，
+    //     且 blob 上下文下图标相对路径会解析失败，因此必须用静态文件）
     function applyManifest() {
         var link = document.querySelector('#manifest-link');
         if (!link) return;
-        var manifest = {
-            name: '芽芽机',
-            short_name: '芽芽机',
-            id: './index.html',
-            start_url: './index.html',
-            scope: './',
-            display: 'fullscreen',
-            background_color: '#ffffff',
-            theme_color: '#ffffff',
-            lang: 'zh-CN',
-            orientation: 'portrait',
-            icons: [
-                {
-                    src: './icon-192.png',
-                    sizes: '192x192',
-                    type: 'image/png',
-                    purpose: 'any maskable'
-                },
-                {
-                    src: './icon-512.png',
-                    sizes: '512x512',
-                    type: 'image/png',
-                    purpose: 'any maskable'
-                }
-            ]
-        };
-        try {
-            var blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
-            var url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            console.log('[PWA] manifest 已覆写（本地图标）');
-        } catch (e) {
-            console.warn('[PWA] manifest 覆写失败:', e && e.message);
-        }
+        link.setAttribute('href', './manifest.json');
+        console.log('[PWA] manifest 指向静态 manifest.json');
     }
 
-    // script.js 在 DOMContentLoaded 里用 Blob 覆写过一次 manifest，
-    // 这里在其后再次覆写，确保最终生效。
+    // 立即挂上静态 manifest；script.js 在 DOMContentLoaded 会改成 blob，
+    // 这里在其后再次改回静态文件，确保安装校验读到静态 manifest。
+    applyManifest();
     if (document.readyState === 'loading') {
         window.addEventListener('load', registerExternalSW);
         document.addEventListener('DOMContentLoaded', function () {
